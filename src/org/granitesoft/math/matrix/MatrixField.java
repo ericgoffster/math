@@ -321,11 +321,20 @@ public class MatrixField<R> implements ExpField<Matrix<R>> {
                 final VectorWrapper<D> row1 = z1.getRow(j);
                 final VectorWrapper<D> row2 = z2.getRow(j);
                 final D div = row1.get(i);
-                for(int k = i + 1; k < size; k++) {
-                    row1.set(k, f2.subtract(f2.multiply(row1.get(k), pivot), f2.multiply(pivotRow1.get(k), div)));
-                }
-                for(int k = 0; k < size; k++) {
-                    row2.set(k, f2.subtract(f2.multiply(row2.get(k), pivot), f2.multiply(pivotRow2.get(k), div)));
+                if (f2.isZero(div)) {
+                    for(int k = i + 1; k < size; k++) {
+                        row1.set(k, f2.multiply(row1.get(k), pivot));
+                    }
+                    for(int k = 0; k < size; k++) {
+                        row2.set(k, f2.multiply(row2.get(k), pivot));
+                    }
+                } else {
+                    for(int k = i + 1; k < size; k++) {
+                        row1.set(k, f2.subtract(f2.multiply(row1.get(k), pivot), f2.multiply(pivotRow1.get(k), div)));
+                    }
+                    for(int k = 0; k < size; k++) {
+                        row2.set(k, f2.subtract(f2.multiply(row2.get(k), pivot), f2.multiply(pivotRow2.get(k), div)));
+                    }
                 }
             }
         }
