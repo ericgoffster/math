@@ -2,6 +2,9 @@ package org.granitesoft.math.matrix;
 
 import static org.junit.Assert.assertTrue;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.granitesoft.math.ExpField;
 import org.granitesoft.math.primtive.DoubleExpField;
 import org.junit.Test;
@@ -26,7 +29,21 @@ public class TestMatrixField {
     }
 
     Matrix<Double> fromArray(double[][] d) {
-        return VirtualMatrix.fromArray(DoubleExpField.R, d);
+        List<Vector<Double>> rows = new ArrayList<>(d.length);
+        List<Vector<Double>> cols = new ArrayList<>(d.length);
+        int[] nonZeroValues = new int[d.length];
+        for(int j = 0; j < d.length; j++) {
+            nonZeroValues[j] = j;
+        }
+        for(int i = 0; i < d.length; i++) {
+            final int r = i;
+            rows.add(new VirtualVector<Double>(d.length, c -> d[r][c], nonZeroValues));
+        }
+        for(int j = 0; j < d.length; j++) {
+            final int c = j;
+            cols.add(new VirtualVector<Double>(d.length, r -> d[r][c], nonZeroValues));
+        }
+        return new VirtualMatrix<Double>(rows, cols);
     }
 
     @Test

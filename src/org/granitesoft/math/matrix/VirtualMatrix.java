@@ -3,7 +3,8 @@ package org.granitesoft.math.matrix;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.function.BiFunction;
+import java.util.function.BinaryOperator;
+import java.util.function.Function;
 
 import org.granitesoft.math.ExpField;
 
@@ -21,16 +22,12 @@ public class VirtualMatrix<T> extends AbstractMatrix<T> {
         return byCol.get(column);
     }
 
-    private VirtualMatrix(List<Vector<T>> byRow, List<Vector<T>> byCol) {
+    VirtualMatrix(List<Vector<T>> byRow, List<Vector<T>> byCol) {
         super(byCol.size(), byRow.size());
         this.byRow = byRow;
         this.byCol = byCol;
     }
     
-    static <T> Matrix<T> fromArray(ExpField<T> field, Object arr) {
-        return create(field, new MatrixWrapper<T>(arr));
-    }
-
     static <T> Matrix<T> diagonal(final Vector<T> diagonal, ExpField<T> field, int width, int height) {
         T zero = field.valueOf(0);
         List<Vector<T>> rows = new ArrayList<Vector<T>>();
@@ -72,45 +69,99 @@ public class VirtualMatrix<T> extends AbstractMatrix<T> {
         return new VirtualMatrix<T>(rows, cols);
     }
     
-    static <T> VirtualMatrix<T> create(ExpField<T> field, MatrixWrapper<T> arr) {
+    static int[] merge(int[] a, int[] b, int size) {
+        int i = 0;
+        int j = 0;
+        int k = 0;
+        int[] c = new int[size];
+        while(i < a.length && j < b.length) {
+            if (a[i] < b[j]) {
+                c[k++] = a[i++];
+            } else if (a[i] > b[j]) {
+                c[k++] = b[j++];
+            } else {
+                c[k++] = a[i++];
+                j++;
+            }
+        }
+        while(i < a.length) {
+            c[k++] = a[i++];
+        }
+        while(j < b.length) {
+            c[k++] = b[j++];
+        }
+        return Arrays.copyOf(c, k);
+    }
+
+    // It is a requirement here that
+    // f(0,0) == 0
+    static <T> VirtualMatrix<T> map(Matrix<T> x, Matrix<T> y, BinaryOperator<T> f) {
+        final int height = x.getHeight();
+        final int width = y.getWidth();
+        final ArrayList<Vector<T>> rows = new ArrayList<>(height);
+        final ArrayList<Vector<T>> cols = new ArrayList<>(width);
+        for(int row = 0; row < height; row++) {
+            Vector<T> rwx = x.getRow(row);
+            Vector<T> rwy = y.getRow(row);
+            int[] merged = merge(rwx.nonZeroValues(), rwy.nonZeroValues(), width);
+            rows.add(new VirtualVector<T>(width, col -> f.apply(rwx.get(col), rwy.get(col)), merged));
+        }
+        for(int col = 0; col < width; col++) {
+            Vector<T> clx = x.getColumn(col);
+            Vector<T> cly = y.getColumn(col);
+            int[] merged = merge(clx.nonZeroValues(), cly.nonZeroValues(), height);
+            cols.add(new VirtualVector<T>(height, row -> f.apply(clx.get(row), cly.get(row)), merged));
+        }
+        return new VirtualMatrix<T>(rows, cols);
+    }
+ 
+    // It is a requirement here that
+    // f(0) == 0
+    static <T, U> VirtualMatrix<T> map(Matrix<U> src, Function<U, T> f) {
+        final int height = src.getHeight();
+        final int width = src.getWidth();
+        final List<Vector<T>> rows = new ArrayList<>(height);
+        final List<Vector<T>> cols = new ArrayList<>(width);
+        for(int row = 0; row < height; row++) {
+            final Vector<U> rw = src.getRow(row);
+            rows.add(new VirtualVector<T>(width, col -> f.apply(rw.get(col)), rw.nonZeroValues()));
+        }
+        for(int col = 0; col < width; col++) {
+            final Vector<U> cl = src.getColumn(col);
+            cols.add(new VirtualVector<T>(height, row -> f.apply(cl.get(row)), cl.nonZeroValues()));
+        }
+        return new VirtualMatrix<T>(rows, cols);
+    }
+
+    static <T> VirtualMatrix<T> create(MatrixWrapper<T> arr, boolean[][] isNonZero) {
         int height = arr.getHeight();
         int width = arr.getWidth();
         List<Vector<T>> rows = new ArrayList<>(height);
         List<Vector<T>> cols = new ArrayList<>(width);
         for(int row = 0; row < height; row++) {
+            boolean[] inz = isNonZero[row];
             int[] nz = new int[width];
             int j = 0;
             for(int col = 0; col < width; col++) {
-                if (!field.isZero(arr.get(row,  col))) {
+                if (inz[col]) {
                     nz[j++] = col;
                 }
             }
-            final int r = row;
-            rows.add(new VirtualVector<T>(width, col -> arr.get(r, col), Arrays.copyOf(nz, j)));
+            final VectorWrapper<T> r = arr.getRow(row);
+            rows.add(new VirtualVector<T>(width, col -> r.get(col), Arrays.copyOf(nz, j)));
         }
         for(int col = 0; col < width; col++) {
             int[] nz = new int[height];
             int j = 0;
             for(int row = 0; row < height; row++) {
-                if (!field.isZero(arr.get(row,  col))) {
+                boolean[] inz = isNonZero[row];
+                if (inz[col]) {
                     nz[j++] = row;
                 }
             }
             final int c = col;
-            cols.add(new VirtualVector<T>(height, row -> arr.get(row, c), Arrays.copyOf(nz, j)));
+            cols.add(new VirtualVector<T>(height, row -> arr.getRow(row).get(c), Arrays.copyOf(nz, j)));
         }
         return new VirtualMatrix<T>(rows, cols);
-    }
-    /**
-     * @param field  
-     */
-    static <T> VirtualMatrix<T> create(int width, int height, ExpField<T> field, BiFunction<Integer, Integer, T> f) {
-        MatrixWrapper<T> arr = new MatrixWrapper<T>(width, height);
-        for(int row = 0; row < height; row++) {
-            for(int col = 0; col < width; col++) {
-                arr.set(row, col, f.apply(row, col));
-            }
-        }
-        return create(field, arr);
     }
 }

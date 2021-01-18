@@ -1,36 +1,45 @@
 package org.granitesoft.math.matrix;
 
-import java.lang.reflect.Array;
+import java.util.List;
 
 public class MatrixWrapper<T> {
-    private final Object members;
+    private final List<VectorWrapper<T>> members;
     
-    public MatrixWrapper(Object arr) {
+    public MatrixWrapper(List<VectorWrapper<T>> arr) {
         this.members = arr;
-    }
-    public MatrixWrapper(int width, int height) {
-        this.members = Array.newInstance(Object.class, height, width);
     }
     
     public int getHeight() {
-        return Array.getLength(members);
+        return members.size();
     }
     
     public int getWidth() {
-        return Array.getLength(Array.get(members, 0));
+        return members.get(0).getSize();
     }
     
-    public T get(int row, int col) {
-        return (T)Array.get(Array.get(members, row), col);
+    public VectorWrapper<T> getRow(int row) {
+        return members.get(row);
     }
     
-    public void set(int row, int col, T v) {
-        Array.set(Array.get(members, row), col, v);
-    }
-
     public void swapRows(int row1, int row2) {
-        Object l = Array.get(members, row1);
-        Array.set(members, row1, Array.get(members, row2));
-        Array.set(members, row2, l);
+        if (row1 != row2) {
+            VectorWrapper<T> l = members.get(row1);
+            members.set(row1, members.get(row2));
+            members.set(row2, l);
+        }
+    }
+    
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{");
+        for(int i = 0; i < getHeight(); i++) {
+            if (i > 0) {
+                sb.append(",");
+            }
+            sb.append(getRow(i));
+        }
+        sb.append("}");
+        return sb.toString();
     }
 }

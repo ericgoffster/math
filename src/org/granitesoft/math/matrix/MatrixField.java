@@ -1,5 +1,8 @@
 package org.granitesoft.math.matrix;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.granitesoft.math.ExpField;
 import org.granitesoft.math.Exponential;
 import org.granitesoft.math.MappedField;
@@ -30,8 +33,7 @@ public class MatrixField<R> implements ExpField<Matrix<R>> {
 
     @Override
     public Matrix<R> negate(Matrix<R> x) {
-        return VirtualMatrix.create(size, size, f,
-                (row, col) -> f.negate(x.getRow(row).get(col)));
+        return VirtualMatrix.map(x, f::negate);
     }
 
     @Override
@@ -47,12 +49,11 @@ public class MatrixField<R> implements ExpField<Matrix<R>> {
     @Override
     public Matrix<R> quotient(Matrix<R> x, Matrix<R> y) {
         final Matrix<R> z = divide(x, y);
-        final Matrix<R> flr = floor(z);
-        final Matrix<R> ceil = ceil(z);
-        final Matrix<R> m1 = subtract(z, flr);
-        final Matrix<R> m2 = subtract(z, ceil);
-        return VirtualMatrix.create(size, size, f,
-                (row, col) ->  f.closerToZero(m1.getRow(row).get(col), m2.getRow(row).get(col)) ? flr.getRow(row).get(col) : ceil.getRow(row).get(col));
+        return VirtualMatrix.map(z, v -> {
+            final R flr = f.floor(v);
+            final R ceil = f.ceil(v);
+            return f.closerToZero(f.subtract(v, flr), f.subtract(v, ceil)) ? flr : ceil;
+        });
     }
 
     @Override
@@ -62,14 +63,12 @@ public class MatrixField<R> implements ExpField<Matrix<R>> {
 
     @Override
     public Matrix<R> floor(Matrix<R> x) {
-        return VirtualMatrix.create(size, size, f,
-                (row, col) -> f.floor(x.getRow(row).get(col)));
+        return VirtualMatrix.map(x, f::floor);
     }
 
     @Override
     public Matrix<R> ceil(Matrix<R> x) {
-        return VirtualMatrix.create(size, size, f,
-                (row, col) -> f.ceil(x.getRow(row).get(col)));
+        return VirtualMatrix.map(x, f::ceil);
     }
 
     @Override
@@ -230,99 +229,142 @@ public class MatrixField<R> implements ExpField<Matrix<R>> {
     }
 
     static <R,D> Matrix<R> downcast(MappedField<R, D> f2, Matrix<D> m) {
-        return VirtualMatrix.create(m.getWidth(), m.getHeight(), f2,
-                (row,col) -> f2.downcast.apply(m.getRow(row).get(col)));
+        return VirtualMatrix.map(m, v -> f2.downcast.apply(v));
     }
 
     static <R,D> Matrix<D> upcast(MappedField<R, D> f2, Matrix<R> m) {
-        return VirtualMatrix.create(m.getWidth(), m.getHeight(), f2.f,
-                (row,col) -> f2.upcast.apply(m.getRow(row).get(col)));
+        return VirtualMatrix.map(m, v -> f2.upcast.apply(v));
     }
 
     <D> Matrix<R> _multiply(Matrix<R> a, Matrix<R> b) {
         MappedField<R, D> f2 = (MappedField<R, D>) f.upgradePrecision(1);
-        Matrix<D> x = upcast(f2, a);
-        Matrix<D> y = upcast(f2, b);
-        final Matrix<D> z = VirtualMatrix.create(size, size, f2.f, (i, j) -> {
+        return downcast(f2, _multiply2(f2.f, upcast(f2, a), upcast(f2, b)));
+    }
+
+    static <D> Matrix<D> _multiply2(ExpField<D> f2, Matrix<D> x, Matrix<D> y) {
+        int size = x.getWidth();
+        List<VectorWrapper<D>> arr = new ArrayList<VectorWrapper<D>>(size);
+        boolean[][] isNonZero = new boolean[size][size];
+        for(int i = 0; i < size; i++) {
             final Vector<D> row = x.getRow(i);
-            final Vector<D> column = y.getColumn(j);
-            D sum = f2.f.valueOf(0);
             final int[] nonZeroesR = row.nonZeroValues();
-            final int[] nonZeroesC = column.nonZeroValues();
-            int irow = 0;
-            int icol = 0;
-            while(irow < nonZeroesR.length && icol < nonZeroesC.length) {
-                if (nonZeroesR[irow] < nonZeroesC[icol]) {
+            Object[] vrow = new Object[size];
+            boolean[] isnz = isNonZero[i];
+            for(int j = 0; j < size; j++) {
+                final Vector<D> column = y.getColumn(j);
+                final int[] nonZeroesC = column.nonZeroValues();
+                D sum = f2.valueOf(0);
+                int irow = 0;
+                int icol = 0;
+                boolean nz = false;
+                while(irow < nonZeroesR.length && icol < nonZeroesC.length) {
+                    if (nonZeroesR[irow] < nonZeroesC[icol]) {
+                        irow++;
+                        continue;
+                    }
+                    if (nonZeroesR[irow] > nonZeroesC[icol]) {
+                        icol++;
+                        continue;
+                    }
+                    nz = true;
+                    sum = f2.add(sum, f2.multiply(row.get(nonZeroesR[irow]), column.get(nonZeroesC[icol])));
                     irow++;
-                    continue;
-                }
-                if (nonZeroesR[irow] > nonZeroesC[icol]) {
                     icol++;
-                    continue;
                 }
-                sum = f2.f.add(sum, f2.f.multiply(row.get(nonZeroesR[irow]), column.get(nonZeroesC[icol])));
-                irow++;
-                icol++;
+                vrow[j] = sum;
+                isnz[j] = nz;
             }
-            return sum;
-        });
-        return downcast(f2, z);
+            arr.add(new VectorWrapper<D>(vrow));
+        }
+
+        return VirtualMatrix.create(new MatrixWrapper<D>(arr), isNonZero);
     }
 
     <D> Matrix<R> _divide(Matrix<R> a, Matrix<R> b) {
         MappedField<R, D> f2 = (MappedField<R, D>) f.upgradePrecision(1);
-        Matrix<D> x = upcast(f2, a);
-        Matrix<D> y = upcast(f2, b);
-        final MatrixWrapper<D> z = new MatrixWrapper<D>(size * 2, size);
+        return downcast(f2, _divide2(f2.f, upcast(f2, a), upcast(f2, b)));
+    }
+
+    static <D> MatrixWrapper<D> makeCopy(Matrix<D> x) {
+        int size = x.getWidth();
+        List<VectorWrapper<D>> rows = new ArrayList<>(size);
         for(int i = 0; i < size; i++) {
+            Object[] arr = new Object[size];
+            Vector<D> xrow = x.getRow(i);
             for(int j = 0; j < size; j++) {
-                z.set(i, j, y.getRow(i).get(j));
-                z.set(i, j + size, x.getRow(i).get(j));
+                arr[j] = xrow.get(j);
             }
+            rows.add(new VectorWrapper<D>(arr));
         }
+        return new MatrixWrapper<D>(rows);
+    }
+    static <D> VirtualMatrix<D> _divide2(ExpField<D> f2, Matrix<D> x, Matrix<D> y) {
+        int size = x.getWidth();
+        final MatrixWrapper<D> z1 = makeCopy(y);
+        final MatrixWrapper<D> z2 = makeCopy(x);
         for(int i = 0; i < size; i++) {
+            int rowMax = i;
+            VectorWrapper<D> rowi = z1.getRow(rowMax);
             for(int j = i + 1; j < size; j++) {
-                if (f2.f.closerToZero(z.get(i, i), z.get(j, i))) {
-                    z.swapRows(i, j);
+                VectorWrapper<D> rowj = z1.getRow(j);
+                if (f2.closerToZero(rowi.get(i), rowj.get(i))) {
+                    rowMax = j;
+                    rowi = rowj;
                 }
             }
-            D pivot = z.get(i, i);
-            for(int k = i + 1; k < size * 2; k++) {
-                z.set(i, k, f2.f.divide(z.get(i, k), pivot));
-            }               
+            z1.swapRows(i, rowMax);
+            z2.swapRows(i, rowMax);
+            final VectorWrapper<D> pivotRow1 = z1.getRow(i);
+            final VectorWrapper<D> pivotRow2 = z2.getRow(i);
+            final D pivot = pivotRow1.get(i);
             for(int j = i + 1; j < size; j++) {
-                final D div = z.get(j, i);
-                for(int k = i + 1; k < size * 2; k++) {
-                    z.set(j, k, f2.f.subtract(z.get(j, k), f2.f.multiply(z.get(i, k), div)));
-                }               
+                final VectorWrapper<D> row1 = z1.getRow(j);
+                final VectorWrapper<D> row2 = z2.getRow(j);
+                final D div = row1.get(i);
+                if (!f2.isZero(div)) {
+                    for(int k = i + 1; k < size; k++) {
+                        row1.set(k, f2.subtract(row1.get(k), f2.divide(f2.multiply(pivotRow1.get(k), div), pivot)));
+                    }
+                    for(int k = 0; k < size; k++) {
+                        row2.set(k, f2.subtract(row2.get(k), f2.divide(f2.multiply(pivotRow2.get(k), div), pivot)));
+                    }
+                }
             }
         }
+        boolean[][] isNonZero = new boolean[size][size];
         for(int i = size - 1; i >= 0; i--) {
+            final VectorWrapper<D> pivotRow1 = z1.getRow(i);
+            final VectorWrapper<D> pivotRow2 = z2.getRow(i);
+            final D pivot = pivotRow1.get(i);
             for(int j = i - 1; j >= 0; j--) {
-                final D div = z.get(j, i);
-                for(int k = size; k < size * 2; k++) {
-                    z.set(j, k, f2.f.subtract(z.get(j, k), f2.f.multiply(z.get(i, k), div)));
-                }               
+                final VectorWrapper<D> row1 = z1.getRow(j);
+                final VectorWrapper<D> row2 = z2.getRow(j);
+                final D div = row1.get(i);
+                if (!f2.isZero(div)) {
+                    for(int k = 0; k < size; k++) {
+                        row2.set(k, f2.subtract(row2.get(k), f2.divide(f2.multiply(pivotRow2.get(k), div), pivot)));
+                    }
+                }
+            }
+            final boolean[] inz = isNonZero[i];
+            for(int k = 0; k < size; k++) {
+                inz[k] = !f2.isZero(pivotRow2.get(k));
+                if (inz[k]) {
+                    pivotRow2.set(k, f2.divide(pivotRow2.get(k), pivot));
+                }
             }
         }
-        return downcast(f2, VirtualMatrix.create(size, size, f2.f,
-                (row, col) -> z.get(row, col + size)));
+        return VirtualMatrix.create(z2, isNonZero);
     }
 
     <D> Matrix<R> _subtract(Matrix<R> a, Matrix<R> b) {
         MappedField<R, D> f2 = (MappedField<R, D>) f.upgradePrecision(1);
-        Matrix<D> x = upcast(f2, a);
-        Matrix<D> y = upcast(f2, b);
-        return downcast(f2, VirtualMatrix.create(size, size, f2.f,
-                (row, col) -> f2.f.subtract(x.getRow(row).get(col), y.getRow(row).get(col))));
+        return downcast(f2, VirtualMatrix.map(upcast(f2, a), upcast(f2, b), f2.f::subtract));
     }
 
     <D> Matrix<R> _add(Matrix<R> a, Matrix<R> b) {
         MappedField<R, D> f2 = (MappedField<R, D>) f.upgradePrecision(1);
-        Matrix<D> x = upcast(f2, a);
-        Matrix<D> y = upcast(f2, b);
-        return downcast(f2, VirtualMatrix.create(size, size, f2.f,
-                (row, col) ->  f2.f.add(x.getRow(row).get(col), y.getRow(row).get(col))));
+        return downcast(f2, VirtualMatrix.map(upcast(f2, a), upcast(f2, b), f2.f::add));
     }
 
     <D> ExpField<Matrix<R>> expf() {
