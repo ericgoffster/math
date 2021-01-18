@@ -329,24 +329,31 @@ public class MatrixField<R> implements ExpField<Matrix<R>> {
                 }
             }
         }
-        boolean[][] isNonZero = new boolean[size][size];
+        final boolean[][] isNonZero = new boolean[size][size];
         for(int i = size - 1; i >= 0; i--) {
             final VectorWrapper<D> pivotRow1 = z1.getRow(i);
             final VectorWrapper<D> pivotRow2 = z2.getRow(i);
-            final D pivot = pivotRow1.get(i);
-            for(int j = i - 1; j >= 0; j--) {
-                final VectorWrapper<D> row1 = z1.getRow(j);
-                final VectorWrapper<D> row2 = z2.getRow(j);
-                final D div = row1.get(i);
+            {
+                final D pivot = pivotRow1.get(i);
+                final boolean[] inz = isNonZero[i];
                 for(int k = 0; k < size; k++) {
-                    row2.set(k, f2.subtract(row2.get(k), f2.divide(f2.multiply(pivotRow2.get(k), div), pivot)));
+                    final D e = pivotRow2.get(k);
+                    inz[k] = !f2.isZero(e);
+                    if (inz[k]) {
+                        pivotRow2.set(k, f2.divide(e, pivot));
+                    }
                 }
             }
-            final boolean[] inz = isNonZero[i];
-            for(int k = 0; k < size; k++) {
-                inz[k] = !f2.isZero(pivotRow2.get(k));
-                if (inz[k]) {
-                    pivotRow2.set(k, f2.divide(pivotRow2.get(k), pivot));
+            {
+                for(int j = i - 1; j >= 0; j--) {
+                    final VectorWrapper<D> row1 = z1.getRow(j);
+                    final VectorWrapper<D> row2 = z2.getRow(j);
+                    final D div = row1.get(i);
+                    if (!f2.isZero(div)) {
+                        for(int k = 0; k < size; k++) {
+                            row2.set(k, f2.subtract(row2.get(k), f2.multiply(pivotRow2.get(k), div)));
+                        }
+                    }
                 }
             }
         }
