@@ -47,6 +47,14 @@ public class TestMatrixField {
     }
 
     @Test
+    public void testDivide() {
+        Matrix<Double> a = rf3.valueOf(1);
+        Matrix<Double> b = fromArray(new double[][] {{4.0, 7.0}, {2.0, 6.0}});
+        Matrix<Double> c = rf3.divide(a, b);
+        Matrix<Double> d = fromArray(new double[][] {{0.6, -0.7}, {-0.2, 0.4}});
+        assertTrue(same(c,d));
+    }
+    @Test
     public void testAdd() {
         Matrix<Double> a = fromArray(new double[][] {{1.5, 1.2}, {1.1, 1.4}});
         Matrix<Double> b = fromArray(new double[][] {{1.1, 1.3}, {1.0, 0.9}});
