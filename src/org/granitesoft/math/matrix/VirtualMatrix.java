@@ -28,15 +28,83 @@ public class VirtualMatrix<T> extends AbstractMatrix<T> {
         this.byCol = byCol;
     }
     
+    static <T> Matrix<T> upperBiDiagonal(final Vector<T> diagonal, final Vector<T> upper, ExpField<T> field, int width, int height) {
+        T zero = field.valueOf(0);
+        List<Vector<T>> rows = new ArrayList<Vector<T>>();
+        List<Vector<T>> cols = new ArrayList<Vector<T>>();
+        for(int row = 0; row < height; row++) {
+            if (row == height - 1) {
+                rows.add(new ScalarVector<T>(width, zero, row, diagonal.get(row)));
+            } else {
+                rows.add(new DoubleVector<T>(width, zero, row, diagonal.get(row), row + 1, upper.get(row)));
+            }
+        }
+        for(int col = 0; col < width; col++) {
+            if (col == 0) {
+                cols.add(new ScalarVector<T>(width, zero, col, diagonal.get(col)));
+            } else {
+                cols.add(new DoubleVector<T>(width, zero, col - 1, upper.get(col - 1), col, diagonal.get(col)));
+            }
+        }
+        return new VirtualMatrix<T>(rows, cols);
+    }
+    static <T> Matrix<T> lowerBiDiagonal(final Vector<T> diagonal, final Vector<T> lower, ExpField<T> field, int width, int height) {
+        T zero = field.valueOf(0);
+        List<Vector<T>> rows = new ArrayList<Vector<T>>();
+        List<Vector<T>> cols = new ArrayList<Vector<T>>();
+        for(int row = 0; row < height; row++) {
+            if (row == 0) {
+                rows.add(new ScalarVector<T>(width, zero, row, diagonal.get(row)));
+            } else if (row == height - 1) {
+                rows.add(new DoubleVector<T>(width, zero, row - 1, lower.get(row - 1), row, diagonal.get(row)));
+            } else {
+                rows.add(new DoubleVector<T>(width, zero, row - 1, lower.get(row - 1), row, diagonal.get(row)));
+            }
+        }
+        for(int col = 0; col < width; col++) {
+            if (col == 0) {
+                cols.add(new DoubleVector<T>(width, zero, col, diagonal.get(col), col + 1, lower.get(col)));
+            } else if (col == height - 1) {
+                cols.add(new ScalarVector<T>(width, zero, col, diagonal.get(col)));
+            } else {
+                cols.add(new DoubleVector<T>(width, zero, col, diagonal.get(col), col + 1, lower.get(col)));
+            }
+        }
+        return new VirtualMatrix<T>(rows, cols);
+    }
+    static <T> Matrix<T> triDiagonal(final Vector<T> diagonal, final Vector<T> upper, final Vector<T> lower, ExpField<T> field, int width, int height) {
+        T zero = field.valueOf(0);
+        List<Vector<T>> rows = new ArrayList<Vector<T>>();
+        List<Vector<T>> cols = new ArrayList<Vector<T>>();
+        for(int row = 0; row < height; row++) {
+            if (row == 0) {
+                rows.add(new DoubleVector<T>(width, zero, row, diagonal.get(row), row + 1, upper.get(row)));
+            } else if (row == height - 1) {
+                rows.add(new DoubleVector<T>(width, zero, row - 1, lower.get(row - 1), row, diagonal.get(row)));
+            } else {
+                rows.add(new TripleVector<T>(width, zero, row - 1, lower.get(row - 1), row, diagonal.get(row), row + 1, upper.get(row)));
+            }
+        }
+        for(int col = 0; col < width; col++) {
+            if (col == 0) {
+                cols.add(new DoubleVector<T>(width, zero, col, diagonal.get(col), col + 1, lower.get(col)));
+            } else if (col == height - 1) {
+                cols.add(new DoubleVector<T>(width, zero, col - 1, upper.get(col - 1), col, diagonal.get(col)));
+            } else {
+                cols.add(new TripleVector<T>(width, zero, col - 1, upper.get(col - 1), col, diagonal.get(col), col + 1, lower.get(col)));
+            }
+        }
+        return new VirtualMatrix<T>(rows, cols);
+    }
     static <T> Matrix<T> diagonal(final Vector<T> diagonal, ExpField<T> field, int width, int height) {
         T zero = field.valueOf(0);
         List<Vector<T>> rows = new ArrayList<Vector<T>>();
         List<Vector<T>> cols = new ArrayList<Vector<T>>();
         for(int row = 0; row < height; row++) {
-            rows.add(new ScalarVector<T>(width, row, zero, diagonal.get(row)));
+            rows.add(new ScalarVector<T>(width, zero, row, diagonal.get(row)));
         }
         for(int col = 0; col < width; col++) {
-            cols.add(new ScalarVector<T>(height, col, zero, diagonal.get(col)));
+            cols.add(new ScalarVector<T>(height, zero, col, diagonal.get(col)));
         }
         return new VirtualMatrix<T>(rows, cols);
     }
@@ -46,10 +114,10 @@ public class VirtualMatrix<T> extends AbstractMatrix<T> {
         List<Vector<T>> rows = new ArrayList<Vector<T>>();
         List<Vector<T>> cols = new ArrayList<Vector<T>>();
         for(int row = 0; row < height; row++) {
-            rows.add(new ScalarVector<T>(width, row, zero, val));
+            rows.add(new ScalarVector<T>(width, zero, row, val));
         }
         for(int col = 0; col < width; col++) {
-            cols.add(new ScalarVector<T>(height, col, zero, val));
+            cols.add(new ScalarVector<T>(height, zero, col, val));
         }
         return new VirtualMatrix<T>(rows, cols);
     }

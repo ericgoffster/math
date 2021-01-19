@@ -11,7 +11,7 @@ import org.junit.Test;
 
 public class TestMatrixField {
     
-    ExpField<Matrix<Double>> rf3 = new MatrixField<>(2, DoubleExpField.R);
+    static ExpField<Matrix<Double>> rf3 = new MatrixField<>(2, DoubleExpField.R);
 
     boolean same(Matrix<Double> d, Matrix<Double> d2) {
         double diff = 0 ;
@@ -178,4 +178,26 @@ public class TestMatrixField {
             {36.423719318529390,111.98943978404721}});     
         assertTrue(same(c,d));
     }
+    
+    public static void main(String[] args) {
+        ExpField<Matrix<Double>> rf3 = new MatrixField<>(10, DoubleExpField.R);
+        double[] vec  = new double[] {1.01, .97,.23,-.78,-.3, 2.3, 1.1,  3.1,  -.5, .2};
+        double[] vec1 = new double[] { .23,-.15,.11, 0.7,-.1,  .5, .23, -.07, -.13};
+        double[] vec2 = new double[] { .13, .45,-.04, .1, .34, .2, -.2, .18,  -.8};
+        int[] nz = new int[] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+        int[] nz2 = new int[] {0, 1, 2, 3, 4, 5, 6, 7, 8};
+        Matrix<Double> a = rf3.valueOf(1);
+        Matrix<Double> b = VirtualMatrix.lowerBiDiagonal(
+                new VirtualVector<Double>(10, i -> vec[i], nz),
+                new VirtualVector<Double>(9, i -> vec1[i], nz2),
+                //new VirtualVector<Double>(9, i -> vec2[i], nz2),
+                DoubleExpField.R, 10, 10);
+        Matrix<Double> c = rf3.divide(a, b);
+        for(int i = 0; i < 10; i++) {
+            for(int j = 0; j < 10; j++) {
+                System.out.printf("%+.6f ", c.getRow(i).get(j));
+            }
+            System.out.println();
+        }
+     }
 }

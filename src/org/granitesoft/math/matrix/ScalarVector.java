@@ -5,7 +5,7 @@ public class ScalarVector<T> extends AbstractVector<T> {
     final T val;
     final int pos;
 
-    public ScalarVector(int size, int pos, T zero, T val) {
+    public ScalarVector(int size, T zero, int pos, T val) {
         super(size, new int[] {pos});
         this.zero = zero;
         this.val = val;
